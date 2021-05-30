@@ -89,26 +89,6 @@ def taup_arrival_times(catalog, stationxml, phase="P", earth_model="iasp91",
         evdp = ev_origin_info.depth/1000
         evlo = ev_origin_info.longitude
         evla = ev_origin_info.latitude
-
-        # Retrieve magnitude from catalog
-        mag_list = []
-        for mag in event['magnitudes']:
-            
-            if mag['magnitude_type'] == None:
-                continue
-            
-            # We prefer Mw estimations
-            if mag['magnitude_type'].lower() == "mw":
-                magnitude = mag['mag']
-                mag_list = []
-                break
-            else:
-                mag_list.append(mag['mag'])
-        
-        # If no Mw was available, take the minimum value among the available
-        # magnitudes
-        if len(mag_list) > 0:
-            magnitude = np.min(mag_list)
         
         for stnm in stations.keys():
             stlo = stations[stnm]['longitude']
@@ -131,7 +111,7 @@ def taup_arrival_times(catalog, stationxml, phase="P", earth_model="iasp91",
                                                receiver_depth_in_km=0.0)
                 arrivals["events"].setdefault(i, {})
                 arrivals["events"][i].setdefault('event_info', {'latitude':evla, 'longitude':evlo,
-                                                      'depth':evdp, 'origin_time':otime, 'magnitude':magnitude})
+                                                      'depth':evdp, 'origin_time':otime})
                 arrivals["events"][i].setdefault('arrivals', {})
                 arrivals["events"][i]['arrivals'].setdefault(stnm, {})
                 arrivals["events"][i]['arrivals'][stnm]["arrival_time"] = atime[0].time

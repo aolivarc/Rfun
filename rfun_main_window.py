@@ -5,13 +5,6 @@ Created on Fri Apr  3 14:45:54 2020
 @author: olivar
 """
 
-# isp imports
-"""from isp.Gui.Frames import BaseFrame
-from isp.Gui import pyqt, pqg, pw, pyc, qt
-import isp.receiverfunctions.rf_dialogs as dialogs
-import isp.receiverfunctions.rf_main_window_utils as mwu
-from isp.Gui.Frames.uis_frames import UiReceiverFunctions"""
-
 # standalone imports
 import rfun_dialogs as dialogs
 import rfun_main_window_utils as mwu
@@ -39,14 +32,16 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.backend_bases
 import matplotlib.patches as mpatches
 from owslib.wms import WebMapService
+import scipy.interpolate as scint
 
-#class RecfFrame(BaseFrame, UiReceiverFunctions):
 class RfunMainWindow(QtWidgets.QMainWindow):
     
     def __init__(self):
         super(RfunMainWindow, self).__init__()
         uic.loadUi("ui/RfunMainWindow.ui", self)
         self.show()
+        
+        self.settings = mwu.read_preferences()
         
         # RF analysis-related attributes
         self.data_map = {}
@@ -84,6 +79,7 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         # Connect GUI elements
         self.connect_rf_analysis_gui_elements()
         self.connect_ccp_stack_gui_elements()
+        self.connect_hk_map_gui_elements()
     
     def connect_rf_analysis_gui_elements(self):
         # Menu actions
@@ -91,6 +87,8 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         self.actionRead_metadata.triggered.connect(self.read_metadata)
         self.actionCompute_source_functions.triggered.connect(self.compute_srcfs)
         self.actionCut_earthquakes_from_raw_data.triggered.connect(self.cut_earthquakes_dialog)
+        self.actionPreferences.triggered.connect(self.preferences_dialog)
+        
         # Pushbuttons
         self.pushButton.clicked.connect(self.compute_rfs)
         self.pushButton_2.clicked.connect(self.save_rfs)
@@ -99,9 +97,9 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         self.pushButton_3.clicked.connect(self.plot_rf_stack)
         self.pushButton_5.clicked.connect(self.plot_hk_stack)
         self.pushButton_9.clicked.connect(self.plot_map)
-        self.pushButton_4.clicked.connect(partial(self.save_figure_dialog, "stack_figure"))
-        self.pushButton_15.clicked.connect(partial(self.save_figure_dialog, "hk_stack_figure"))
-        self.pushButton_10.clicked.connect(partial(self.save_figure_dialog, "earthquakes_map_figure"))
+        self.pushButton_4.clicked.connect(partial(self.save_figure, self.mplwidget_2.figure))
+        self.pushButton_15.clicked.connect(partial(self.save_figure, self.mplwidget_3.figure))
+        self.pushButton_10.clicked.connect(partial(self.save_figure, self.mplwidget_4.figure))
         self.pushButton_6.clicked.connect(self.save_hk_result)
         
         self.pushButton_17.clicked.connect(self.filter_by_magnitude)
@@ -110,6 +108,19 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         self.comboBox_3.currentTextChanged.connect(self.plot_rfs)
         # mplwidgets
         self.mplwidget.figure.canvas.mpl_connect('button_press_event', self.recf_plot_clicked)
+    
+    def connect_hk_map_gui_elements(self):
+        self.actionRead_H_k_results_file.triggered.connect(self.read_hk_results)
+        self.pushButton_18.clicked.connect(self.plot_hk_results)
+        
+        for doubleSpinBox in [self.doubleSpinBox_33, self.doubleSpinBox_34,
+                              self.doubleSpinBox_35, self.doubleSpinBox_36]:
+            
+            doubleSpinBox.valueChanged.connect(self.update_hk_map)
+        
+        self.comboBox_7.currentTextChanged.connect(self.hk_basemap)
+        self.doubleSpinBox_38.valueChanged.connect(self.hk_gridlines)
+        self.pushButton_20.clicked.connect(partial(self.save_figure, self.mplwidget_6.figure))
         
     def connect_ccp_stack_gui_elements(self):
         # Menu actions
@@ -124,22 +135,27 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         self.pushButton_25.clicked.connect(partial(self.ccp_stack_map_toggle_plot_mode, "cross_section"))
         self.pushButton_12.clicked.connect(self.compute_ccp_stack)
         self.pushButton_14.clicked.connect(self.save_ccp_stack)
-        self.pushButton_13.clicked.connect(partial(self.save_figure_dialog, "ccp_stack_figure"))
+        self.pushButton_13.clicked.connect(partial(self.save_figure, self.mplwidget_5.figure))
         self.pushButton_26.clicked.connect(self.cross_section_dialog)
 
-        self.doubleSpinBox_21.valueChanged.connect(self.change_ccp_map_extent)
-        self.doubleSpinBox_22.valueChanged.connect(self.change_ccp_map_extent)
-        self.doubleSpinBox_23.valueChanged.connect(self.change_ccp_map_extent)
-        self.doubleSpinBox_24.valueChanged.connect(self.change_ccp_map_extent)
+        self.doubleSpinBox_21.valueChanged.connect(self.update_ccp_map)
+        self.doubleSpinBox_22.valueChanged.connect(self.update_ccp_map)
+        self.doubleSpinBox_23.valueChanged.connect(self.update_ccp_map)
+        self.doubleSpinBox_24.valueChanged.connect(self.update_ccp_map)
         self.doubleSpinBox_25.valueChanged.connect(self.plot_ccp_stack)
         
-        #♠self.doubleSpinBox_26.valueChanged.connect(self.plot_ccp_stack)
+        self.doubleSpinBox_26.valueChanged.connect(self.ccp_gridlines)
         
-        self.comboBox_6.currentTextChanged.connect(self.plot_ccp_basemap)
+        self.comboBox_6.currentTextChanged.connect(self.ccp_basemap)
         self.spinBox_5.valueChanged.connect(self.plot_ccp_stack)
-        self.doubleSpinBox_26.valueChanged.connect(self.ccp_map_axes_gridlines)
-        self.spinBox_6.valueChanged.connect(self.update_ccp_tile_map)
+
+        self.spinBox_6.valueChanged.connect(self.ccp_basemap)
+
+    def preferences_dialog(self):
+        dialog = dialogs.PreferencesDialog()
+        dialog.exec_()
         
+        self.settings = mwu.read_preferences()
     
     def read_waveforms(self):
         """Map the mseed files inside the given directory, return a dict
@@ -194,7 +210,10 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         self.rfs = mwu.compute_rfs(stnm, self.data_map, self.arrivals,
                                      srfs=self.srcfs, a=a, c=c,
                                      corner_freqs=(self.doubleSpinBox_27.value(),
-                                                   self.doubleSpinBox_28.value()))
+                                                   self.doubleSpinBox_28.value()),
+                                     normalize=self.settings['rfs']['computation']['normalize'],
+                                     w0=self.settings['rfs']['computation']['w0'],
+                                     time_shift=self.settings['rfs']['computation']['time_shift'])
         
         # Restore the previous accepted/rejected state
         sorted_rej = sorted(rejections, key=lambda x: x[1])
@@ -245,12 +264,12 @@ class RfunMainWindow(QtWidgets.QMainWindow):
             text = np.round(self.rfs[rf_index+i][sort_index], decimals=0)
             evid = self.rfs[rf_index+i][6]
             
-            self.mplwidget.figure.axes[i].fill_between(t, rf, color='black',
-                                                       linewidth=0.5)            
+            self.mplwidget.figure.axes[i].fill_between(t, rf, color=self.settings['rfs']['appearance']['line_color'],
+                                                       linewidth=self.settings['rfs']['appearance']['line_width'])            
             self.mplwidget.figure.axes[i].fill_between(t, np.zeros(len(t)),
-                                                       rf, where=(rf > 0), color='black')
+                                                       rf, where=(rf > 0), color=self.settings['rfs']['appearance']['positive_fill_color'])
             self.mplwidget.figure.axes[i].fill_between(t, np.zeros(len(t)),
-                                                       rf, where=(rf < 0), color='red')
+                                                       rf, where=(rf < 0), color=self.settings['rfs']['appearance']['negative_fill_color'])
             
             if self.rfs[rf_index+i][5]:
                 plt.setp(self.mplwidget.figure.axes[i].spines.values(), color='darkblue', linewidth=0.4)
@@ -361,29 +380,32 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         stack, bin_stacks, bins, ymin, ymax = mwu.compute_stack(self.rfs, bin_size=self.spinBox.value(),
                                                                   overlap=self.spinBox_2.value(),
                                                                   stack_by=self.comboBox_2.currentText(),
-                                                                  moveout_phase=self.comboBox_4.currentText())
+                                                                  moveout_correction=self.comboBox_4.currentText(),
+                                                                  ref_slowness=self.settings['rfs']['stacking']['ref_slowness'])
         self.setup_rf_stack_axes()
         
         t = self.rfs[0][1]
         
-        self.mplwidget_2.figure.axes[0].plot(t, stack, color='black', linewidth=0.5)
+        self.mplwidget_2.figure.axes[0].plot(t, stack, color=self.settings['rfs']['appearance']['line_color'],
+                                             linewidth=self.settings['rfs']['appearance']['line_width'])
         self.mplwidget_2.figure.axes[0].fill_between(t, 0, stack,
                                                      where=(stack > 0),
-                                                     color='black')
+                                                     color=self.settings['rfs']['appearance']['positive_fill_color'])
         self.mplwidget_2.figure.axes[0].fill_between(t, 0, stack,
                                                      where=(stack < 0),
-                                                     color='red')
+                                                     color=self.settings['rfs']['appearance']['negative_fill_color'])
         zorder = len(bins)
         for i, b in enumerate(bins):
             bstack = bin_stacks[:,i]+b
             height = np.zeros(len(t)) + b
-            self.mplwidget_2.figure.axes[1].plot(t, bstack, color='black', linewidth=0.5, zorder=zorder)
+            self.mplwidget_2.figure.axes[1].plot(t, bstack, color=self.settings['rfs']['appearance']['line_color'],
+                                                 linewidth=self.settings['rfs']['appearance']['line_width'], zorder=zorder)
             self.mplwidget_2.figure.axes[1].fill_between(t, height, bstack,
                                                          where=(bstack > b),
-                                                         color='black', zorder=zorder)
+                                                         color=self.settings['rfs']['appearance']['positive_fill_color'], zorder=zorder)
             self.mplwidget_2.figure.axes[1].fill_between(t, height, bstack,
                                                          where=(bstack < b),
-                                                         color='red', zorder=zorder)
+                                                         color=self.settings['rfs']['appearance']['negative_fill_color'], zorder=zorder)
         
             zorder -= 1
         
@@ -436,11 +458,11 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         """
         minH = min([self.doubleSpinBox_5.value(), self.doubleSpinBox_6.value()])
         maxH = max([self.doubleSpinBox_5.value(), self.doubleSpinBox_6.value()])
-        Hvalues = self.spinBox_3.value()
+        Hvalues = self.settings['hk']['computation']['H_points']
         
         mink = min([self.doubleSpinBox_3.value(), self.doubleSpinBox_4.value()])
         maxk = max([self.doubleSpinBox_3.value(), self.doubleSpinBox_4.value()])
-        kvalues = self.spinBox_4.value()
+        kvalues = self.settings['hk']['computation']['k_points']
         
         w1 = self.doubleSpinBox_30.value()
         w2 = self.doubleSpinBox_31.value()
@@ -448,12 +470,16 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         
         H_arr, k_arr, matrix, H, k, events = mwu.compute_hk_stack(self.rfs, H_range=(minH, maxH), H_values=Hvalues,
                                                                   k_range=(mink, maxk), k_values=kvalues,
-                                                                  w1=w1, w2=w2, w3=w3)
+                                                                  w1=w1, w2=w2, w3=w3,
+                                                                  avg_vp=self.settings['hk']['computation']['avg_vp'],
+                                                                  semblance_weighting=self.settings['hk']['computation']['semblance_weighting'])
         
-        self.Ps, self.PpPs, self.PpSs_PsPs = mwu.compute_theoretical_arrival_times(H, k)
+        self.Ps, self.PpPs, self.PpSs_PsPs = mwu.compute_theoretical_arrival_times(H, k,
+                                                                                   ref_slowness=self.settings['hk']['theoretical_atimes']['ref_slowness'],
+                                                                                   avg_vp=self.settings['hk']['theoretical_atimes']['avg_vp'])
 
         N_stacked = len([rf for rf in self.rfs if rf[5]]) # NOT VERY EFFICIENT! JUST TESTING
-        a, error_area, k_95, H_95, error_contour_level = mwu.determine_error_region(matrix, H_arr, k_arr, N_stacked)
+        a, error_area, k_95, H_95, error_contour_level = mwu.determine_error_region(matrix, H_arr, k_arr, N_stacked)     
 
         self.hk_result = {"H_arr":H_arr,
                           "k_arr":k_arr,
@@ -464,14 +490,21 @@ class RfunMainWindow(QtWidgets.QMainWindow):
                           "k":k,
                           "k_95":k_95}
 
-        self.setup_hk_stack_axes()        
-        self.mplwidget_3.figure.axes[0].contourf(H_arr, k_arr,  matrix/np.max(np.abs(matrix)), levels=100, vmin=0, vmax=np.max(matrix/np.max(np.abs(matrix))), cmap='viridis')
-        self.mplwidget_3.figure.axes[0].contour(H_arr, k_arr, matrix, levels=[np.max(matrix) - error_contour_level], colors=["green"])
+        self.setup_hk_stack_axes()
+        if self.settings['hk']['appearance']['plotting_method'] == 'colored grid':
+            self.mplwidget_3.figure.axes[0].pcolormesh(H_arr, k_arr, matrix, cmap=self.settings['hk']['appearance']['colormap'])
+        elif self.settings['hk']['appearance']['plotting_method'] == 'filled contour map':
+            self.mplwidget_3.figure.axes[0].contourf(H_arr, k_arr, matrix, levels=10, cmap=self.settings['hk']['appearance']['colormap'])
+        elif self.settings['hk']['appearance']['plotting_method'] == 'contour map':
+            self.mplwidget_3.figure.axes[0].contour(H_arr, k_arr, matrix, levels=10, cmap=self.settings['hk']['appearance']['colormap'])
+            
+        self.mplwidget_3.figure.axes[0].contour(H_arr, k_arr, matrix, levels=[np.max(matrix) - error_contour_level],
+                                                colors=[self.settings['hk']['appearance']['ser_color']])
         self.mplwidget_3.figure.axes[0].set_xlim(minH, maxH)
         self.mplwidget_3.figure.axes[0].set_ylim(mink, maxk)
         if error_area != None:
-            self.mplwidget_3.figure.axes[0].axvline(H, color="white")
-            self.mplwidget_3.figure.axes[0].axhline(k, color="white")
+            self.mplwidget_3.figure.axes[0].axvline(H, color=self.settings['hk']['appearance']['line_color'])
+            self.mplwidget_3.figure.axes[0].axhline(k, color=self.settings['hk']['appearance']['line_color'])
             self.label_3.setText("H: {:.2f} ({:.2f} - {:.2f} @ 95%) km".format(H, H_95[0], H_95[1]))
             self.label_22.setText("k: {:.2f} ({:.2f} - {:.2f} @ 95%)".format(k, k_95[0], k_95[1]))
         else:
@@ -549,6 +582,186 @@ class RfunMainWindow(QtWidgets.QMainWindow):
                                                      transform=ccrs.Geodetic(), markersize=1.5)
         
         self.mplwidget_4.figure.canvas.draw()
+    
+    def read_hk_results(self):
+        fname = QtWidgets.QFileDialog.getOpenFileName()[0]
+        self.hk_results = mwu.read_hk_results_file(fname)
+        self.pushButton_18.setEnabled(True)
+    
+    def plot_hk_results(self):
+
+        try:
+            self.mplwidget_6.figure.clf()
+        except IndexError:
+            pass
+        
+        self.mplwidget_6.figure.subplots(1, subplot_kw=dict(projection=ccrs.PlateCarree()))
+        self.mplwidget_6.figure.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.15)
+
+        values = []
+        points = []
+        for stnm in self.hk_results.keys():
+            values.append(self.hk_results[stnm][self.comboBox_5.currentText()])
+            points.append(self.hk_results[stnm]["loc"])
+        
+        lats = [x[1] for x in points]
+        lons = [x[0] for x in points]
+        
+        grid_x, grid_y = np.mgrid[min(lons):max(lons):100j, min(lats):max(lats):100j]
+        grid_z = scint.griddata(points, values, (grid_x, grid_y), method='linear', fill_value=np.NaN)
+        
+        if self.settings['map']['appearance']['plotting_method'] == 'colored grid':
+            CS = self.mplwidget_6.figure.axes[0].pcolormesh(grid_x, grid_y, grid_z, cmap=self.settings['map']['appearance']['colormap'])
+        elif self.settings['map']['appearance']['plotting_method'] == 'filled contour map':
+            CS = self.mplwidget_6.figure.axes[0].contourf(grid_x, grid_y, grid_z, cmap=self.settings['map']['appearance']['colormap'])
+        elif self.settings['map']['appearance']['plotting_method'] == 'contour map':
+            CS = self.mplwidget_6.figure.axes[0].contour(grid_x, grid_y, grid_z, cmap=self.settings['map']['appearance']['colormap'])
+        
+        cbar = self.mplwidget_6.figure.add_axes([0.25, 0.1, 0.50, 0.01])
+        self.mplwidget_6.figure.colorbar(CS, cax=cbar, orientation='horizontal')
+        if self.comboBox_5.currentText() == 'H':
+            cbar.set_xlabel('Crustal thickness (km)')
+        elif self.comboBox_5.currentText() == 'k':
+            cbar.set_xlabel(r'$V_P/V_S$')
+        
+        if self.settings['map']['appearance']['include_stations']:
+            self.mplwidget_6.figure.axes[0].scatter(lons, lats, marker=self.settings['map']['appearance']['station_marker'],
+                                                    s=40, c=self.settings['map']['appearance']['station_marker_color'])
+        
+        if self.settings['map']['shapefiles']['include'] and self.settings['map']['shapefiles']['path']:
+            sfs = mwu.read_shapefiles(self.settings['map']['shapefiles']['path'])
+            for sf in sfs:
+                for shape in sf.shapeRecords():
+                    x = [i[0] for i in shape.shape.points[:]]
+                    y = [i[1] for i in shape.shape.points[:]]
+                    self.mplwidget_6.figure.axes[0].plot(x,y, color='black', alpha=0.4)
+        
+        self.mplwidget_6.figure.axes[0].set_extent([min(lons)-0.1, max(lons)+0.1,
+                                                    min(lats)-0.1, max(lats)+0.1], crs=ccrs.PlateCarree())
+        
+        # Update GUI elements
+        for doubleSpinBox in [self.doubleSpinBox_33, self.doubleSpinBox_34,
+                              self.doubleSpinBox_35, self.doubleSpinBox_36]:
+            
+            doubleSpinBox.disconnect()
+            
+        self.doubleSpinBox_34.setValue(min(lats) - 0.1)
+        self.doubleSpinBox_33.setValue(max(lats) + 0.1)
+        self.doubleSpinBox_35.setValue(min(lons) - 0.1)
+        self.doubleSpinBox_36.setValue(max(lons) + 0.1)
+        
+        for doubleSpinBox in [self.doubleSpinBox_33, self.doubleSpinBox_34,
+                              self.doubleSpinBox_35, self.doubleSpinBox_36]:
+            
+            doubleSpinBox.valueChanged.connect(self.update_hk_map)
+        
+        self.mplwidget_6.figure.axes[0].set_zorder(1)
+
+        self.hk_basemap()
+        self.hk_gridlines()
+
+    
+    def update_hk_map(self):
+        lons = (self.doubleSpinBox_35.value(),self.doubleSpinBox_36.value())
+        lats = (self.doubleSpinBox_34.value(),self.doubleSpinBox_33.value())
+        self.mplwidget_6.figure.axes[0].set_extent([min(lons), max(lons), min(lats), max(lats)], crs=ccrs.PlateCarree())
+        try:
+            self.mplwidget_6_basemap_ax.set_extent([min(lons), max(lons), min(lats), max(lats)], crs=ccrs.PlateCarree())
+        except AttributeError:
+            pass
+        try:
+            self.mplwidget_6_gridlines.set_extent([min(lons), max(lons), min(lats), max(lats)], crs=ccrs.PlateCarree())
+        except AttributeError:
+            pass
+        
+        self.mplwidget_6.figure.canvas.draw()
+    
+    def hk_basemap(self):
+        
+        try:
+            del self.mplwidget_6_basemap_ax
+        except AttributeError:
+            pass
+
+        self.mplwidget_6.figure.axes[0].patch.set_facecolor((1, 1, 1, 0))
+        self.mplwidget_6_basemap_ax = self.mplwidget_6.figure.subplots(1, subplot_kw=dict(projection=ccrs.PlateCarree()))
+        self.mplwidget_6_basemap_ax.set_zorder(0)
+        self.mplwidget_6.figure.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.15)
+        self.mplwidget_6_basemap_ax.set_extent(self.mplwidget_6.figure.axes[0].get_extent())
+        
+        if self.comboBox_7.currentText() == 'Stamen':
+            self.mplwidget_6_basemap_ax.add_image(Stamen('terrain-background'), self.spinBox_8.value())
+    
+        self.mplwidget_6.figure.canvas.draw()
+    
+    def hk_gridlines(self):
+
+        try:
+            self.mplwidget_6_gridlines.remove()
+            del self.mplwidget_6_gridlines
+        except (AttributeError, KeyError) as e:
+            pass
+
+        self.mplwidget_6_gridlines = self.mplwidget_6.figure.subplots(1, subplot_kw=dict(projection=ccrs.PlateCarree()))
+        self.mplwidget_6.figure.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.15)
+        self.mplwidget_6_gridlines.set_extent(self.mplwidget_6.figure.axes[0].get_extent())
+        self.mplwidget_6_gridlines.patch.set_facecolor((1, 1, 1, 0))
+        self.mplwidget_6_gridlines.set_zorder(2)
+        
+        if self.doubleSpinBox_38.value() > 0.01:
+            spacing = self.doubleSpinBox_38.value()
+            gl = self.mplwidget_6_gridlines.gridlines(draw_labels=True)
+            extent = self.mplwidget_6.figure.axes[0].get_extent()
+            xticks = np.arange(extent[0], extent[1] + spacing, spacing)
+            yticks = np.arange(extent[2], extent[3] + spacing, spacing)
+            gl.xlocator = mticker.FixedLocator(xticks)
+            gl.ylocator = mticker.FixedLocator(yticks)
+            gl.xformatter = LONGITUDE_FORMATTER
+            gl.yformatter = LATITUDE_FORMATTER
+        
+        self.mplwidget_6.figure.canvas.draw()
+    
+    def save_figure(self, figure):
+        fname = QtWidgets.QFileDialog.getSaveFileName(None, "Save figure", "", "PNG (*.png)")[0]
+        if fname:
+            figure.savefig(fname, dpi=600)
+            
+
+    def ccp_map_axes_gridlines(self):
+        """Plots grid lines and labels according to the user specified
+        spacing (value of doubleSpinBox_26). If spacing = 0, no grid lines are
+        drawn.
+
+        """
+        if self.first_ccp_stack_plot:
+            return
+        
+        spacing = self.doubleSpinBox_26.value()
+        
+        if self.mplwidget_5_gridlines != None:
+            # Remove previous gridlines if necessary
+            try:
+                self.mplwidget_5_gridlines.remove()
+            except KeyError:
+                pass
+        
+        # Updates to cartopy objects are never shown on already displayed
+        # axes, so we create a new axis for the basemaps, to be placed on top
+        # the data axes
+        self.mplwidget_5_gridlines = self.mplwidget_5.figure.subplots(1, subplot_kw=dict(projection=ccrs.PlateCarree()))
+        self.mplwidget_5_gridlines.set_zorder(2)
+        self.mplwidget_5_gridlines.background_patch.set_facecolor((1, 1, 1, 0))
+        extent = self.mplwidget_5.figure.axes[0].get_extent()
+        self.mplwidget_5_gridlines.set_extent(extent)
+        
+        if spacing > 0.01:
+            self.ccp_map_gridlines = self.mplwidget_5_gridlines.gridlines(draw_labels=True)
+            xticks = np.arange(extent[0], extent[1] + spacing, spacing)
+            yticks = np.arange(extent[2], extent[3] + spacing, spacing)
+            self.ccp_map_gridlines.xlocator = mticker.FixedLocator(xticks)
+            self.ccp_map_gridlines.ylocator = mticker.FixedLocator(yticks)
+        
+        self.mplwidget_5.figure.canvas.draw()
     
     def setup_ccp_map_axes(self):
         """Prepare ccp map axes for plotting
@@ -644,9 +857,9 @@ class RfunMainWindow(QtWidgets.QMainWindow):
             start = (self.ccp_cross_section['y0'], self.ccp_cross_section['x0'])
             end = (self.ccp_cross_section['y1'], self.ccp_cross_section['x1'])
             self.doubleSpinBox_17.setValue(start[0])
-            self.doubleSpinBox_20.setValue(start[1])
+            self.doubleSpinBox_18.setValue(start[1])
             self.doubleSpinBox_19.setValue(end[0])
-            self.doubleSpinBox_18.setValue(end[1])
+            self.doubleSpinBox_20.setValue(end[1])
     
     def ccp_stack_read_rfs(self):
         """Read receiver functions and plot stations on the map
@@ -655,10 +868,7 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         dir_ = QtWidgets.QFileDialog.getExistingDirectory()
         self.rfs_dicts = mwu.map_rfs(rfs_dir=dir_)
         
-        self.setup_ccp_map_axes()
-        self.plot_ccp_stations()
-        self.change_ccp_map_extent()
-        
+        self.plot_ccp_map()
         self.mplwidget_5.figure.canvas.draw()
 
     def compute_ccp_stack(self):
@@ -678,7 +888,9 @@ class RfunMainWindow(QtWidgets.QMainWindow):
                                                      dlon,
                                                      dlat,
                                                      dz,
-                                                     max_depth)
+                                                     max_depth,
+                                                     model=,
+                                                     stacking_method=)
         
         self.istack = None
         
@@ -690,88 +902,115 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         self.plot_ccp_stack()
         
         self.doubleSpinBox_25.setMaximum(max_depth-dz)
-        self.doubleSpinBox_25.setSingleStep(dz)        
+        self.doubleSpinBox_25.setSingleStep(dz)
+    
+    def plot_ccp_map(self):
+
+        self.mplwidget_5.figure.clf()
+        self.mplwidget_5.figure.subplots(1, subplot_kw=dict(projection=ccrs.PlateCarree()))
+        self.mplwidget_5.figure.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.15)
         
-    def plot_ccp_stations(self):
         lats, lons = [], []
         for stnm in self.rfs_dicts.keys():
             stla = self.arrivals['stations'][stnm]["lat"]
             stlo = self.arrivals['stations'][stnm]["lon"]
             lats.append(stla)
             lons.append(stlo)
-            self.mplwidget_5.figure.axes[0].plot(stlo, stla, marker="^",
-                                                 transform=ccrs.Geodetic(), color="green")        
-        self.doubleSpinBox_21.setValue(min(lats) - 0.5)
-        self.doubleSpinBox_22.setValue(max(lats) + 0.5)
-        self.doubleSpinBox_23.setValue(min(lons) - 0.5)
-        self.doubleSpinBox_24.setValue(max(lons) + 0.5)
-    
-    def plot_ccp_basemap(self):
-        # Updates to cartopy objects are never shown on already displayed
-        # axes, so we create a new axis for the basemaps, to be placed behind
-        # the data axes
-        if self.first_ccp_stack_plot:
-                    return
+            
+            if self.settings['ccp']['appearance']['include_stations']:
+                self.mplwidget_5.figure.axes[0].plot(stlo, stla, marker=self.settings['ccp']['appearance']['station_marker'],
+                                                     transform=ccrs.Geodetic(), color=self.settings['ccp']['appearance']['station_marker_color'])
 
-        if self.mplwidget_5_basemap != None:
-            #Remove previous basemap if necessary
-            self.mplwidget_5_basemap.remove()
-
-        if self.comboBox_6.currentText() == "None":
-            self.mplwidget_5_basemap = None
-            self.mplwidget_5.figure.axes[0].background_patch.set_facecolor((1, 1, 1, 1))
-        else:
-            self.mplwidget_5_basemap = self.mplwidget_5.figure.subplots(1, subplot_kw=dict(projection=ccrs.PlateCarree()))
-            self.mplwidget_5.figure.axes[0].set_zorder(1)
-            self.mplwidget_5.figure.axes[0].background_patch.set_facecolor((1, 1, 1, 0))
-            self.mplwidget_5_basemap.set_zorder(0)
-            self.mplwidget_5_basemap.set_extent(self.mplwidget_5.figure.axes[0].get_extent())
+        if self.settings['ccp']['shapefiles']['include'] and self.settings['ccp']['shapefiles']['path']:
+            sfs = mwu.read_shapefiles(self.settings['ccp']['shapefiles']['path'])
+            for sf in sfs:
+                for shape in sf.shapeRecords():
+                    x = [i[0] for i in shape.shape.points[:]]
+                    y = [i[1] for i in shape.shape.points[:]]
+                    self.mplwidget_5.figure.axes[0].plot(x,y, color='black', alpha=0.4)
         
-        if self.comboBox_6.currentText() == "GEBCO":
-            MAP_SERVICE_URL = 'https://www.gebco.net/data_and_products/gebco_web_services/2019/mapserv?'
-            wms = WebMapService(MAP_SERVICE_URL)
-            layer = 'GEBCO_2019_Grid'
-            self.mplwidget_5_basemap.add_wms(wms, layer)
-        elif self.comboBox_6.currentText() == "Stamen":
-            self.mplwidget_5_basemap.add_image(Stamen('terrain-background'), self.spinBox_6.value())
+        self.mplwidget_5.figure.axes[0].set_extent([min(lons)-0.1, max(lons)+0.1,
+                                                    min(lats)-0.1, max(lats)+0.1], crs=ccrs.PlateCarree())
+
+        # Update GUI elements
+        for doubleSpinBox in [self.doubleSpinBox_21, self.doubleSpinBox_22,
+                              self.doubleSpinBox_23, self.doubleSpinBox_24]:
+            
+            doubleSpinBox.disconnect()
+            
+        self.doubleSpinBox_21.setValue(min(lats) - 0.1)
+        self.doubleSpinBox_22.setValue(max(lats) + 0.1)
+        self.doubleSpinBox_23.setValue(min(lons) - 0.1)
+        self.doubleSpinBox_24.setValue(max(lons) + 0.1)
+        
+        for doubleSpinBox in [self.doubleSpinBox_21, self.doubleSpinBox_22,
+                              self.doubleSpinBox_23, self.doubleSpinBox_24]:
+            
+            doubleSpinBox.valueChanged.connect(self.update_ccp_map)
+        
+        self.mplwidget_5.figure.axes[0].set_zorder(1)
+
+        self.ccp_basemap()
+        self.ccp_gridlines()
+        
+        
+    def update_ccp_map(self):
+        lons = (self.doubleSpinBox_23.value(),self.doubleSpinBox_24.value())
+        lats = (self.doubleSpinBox_21.value(),self.doubleSpinBox_22.value())
+        self.mplwidget_5.figure.axes[0].set_extent([min(lons), max(lons), min(lats), max(lats)], crs=ccrs.PlateCarree())
+        try:
+            self.mplwidget_5_basemap_ax.set_extent([min(lons), max(lons), min(lats), max(lats)], crs=ccrs.PlateCarree())
+        except AttributeError:
+            pass
+        try:
+            self.mplwidget_5_gridlines.set_extent([min(lons), max(lons), min(lats), max(lats)], crs=ccrs.PlateCarree())
+        except AttributeError:
+            pass
         
         self.mplwidget_5.figure.canvas.draw()
+
+    def ccp_basemap(self):
+        
+        try:
+            del self.mplwidget_5_basemap_ax
+        except AttributeError:
+            pass
+
+        self.mplwidget_5.figure.axes[0].patch.set_facecolor((1, 1, 1, 0))
+        self.mplwidget_5_basemap_ax = self.mplwidget_5.figure.subplots(1, subplot_kw=dict(projection=ccrs.PlateCarree()))
+        self.mplwidget_5_basemap_ax.set_zorder(0)
+        self.mplwidget_5.figure.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.15)
+        self.mplwidget_5_basemap_ax.set_extent(self.mplwidget_5.figure.axes[0].get_extent())
+        
+        if self.comboBox_6.currentText() == 'Stamen':
+            self.mplwidget_5_basemap_ax.add_image(Stamen('terrain-background'), self.spinBox_6.value())
     
-    def update_ccp_tile_map(self):
-        if self.comboBox_6.currentText() == "Stamen":
-            self.plot_ccp_basemap()
+        self.mplwidget_5.figure.canvas.draw()
+    
+    def ccp_gridlines(self):
 
-    def ccp_map_axes_gridlines(self):
-        """Plots grid lines and labels according to the user specified
-        spacing (value of doubleSpinBox_26). If spacing = 0, no grid lines are
-        drawn.
-
-        """
-        if self.first_ccp_stack_plot:
-            return
-        
-        spacing = self.doubleSpinBox_26.value()
-        
-        if self.mplwidget_5_gridlines != None:
-            # Remove previous gridlines if necessary
+        try:
             self.mplwidget_5_gridlines.remove()
-            
-            if spacing == 0:
-                return
-        
-        # Updates to cartopy objects are never shown on already displayed
-        # axes, so we create a new axis for the basemaps, to be placed on top
-        # the data axes
+            del self.mplwidget_5_gridlines
+        except (AttributeError, KeyError) as e:
+            pass
+
         self.mplwidget_5_gridlines = self.mplwidget_5.figure.subplots(1, subplot_kw=dict(projection=ccrs.PlateCarree()))
+        self.mplwidget_5.figure.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.15)
+        self.mplwidget_5_gridlines.set_extent(self.mplwidget_5.figure.axes[0].get_extent())
+        self.mplwidget_5_gridlines.patch.set_facecolor((1, 1, 1, 0))
         self.mplwidget_5_gridlines.set_zorder(2)
-        self.mplwidget_5_gridlines.background_patch.set_facecolor((1, 1, 1, 0))
-        extent = self.mplwidget_5.figure.axes[0].get_extent()
-        self.mplwidget_5_gridlines.set_extent(extent)
-        self.ccp_map_gridlines = self.mplwidget_5_gridlines.gridlines(draw_labels=True)
-        xticks = np.arange(extent[0], extent[1] + spacing, spacing)
-        yticks = np.arange(extent[2], extent[3] + spacing, spacing)
-        self.ccp_map_gridlines.xlocator = mticker.FixedLocator(xticks)
-        self.ccp_map_gridlines.ylocator = mticker.FixedLocator(yticks)
+        
+        if self.doubleSpinBox_26.value() > 0.01:
+            spacing = self.doubleSpinBox_26.value()
+            gl = self.mplwidget_5_gridlines.gridlines(draw_labels=True)
+            extent = self.mplwidget_5.figure.axes[0].get_extent()
+            xticks = np.arange(extent[0], extent[1] + spacing, spacing)
+            yticks = np.arange(extent[2], extent[3] + spacing, spacing)
+            gl.xlocator = mticker.FixedLocator(xticks)
+            gl.ylocator = mticker.FixedLocator(yticks)
+            gl.xformatter = LONGITUDE_FORMATTER
+            gl.yformatter = LATITUDE_FORMATTER
         
         self.mplwidget_5.figure.canvas.draw()
             
@@ -787,8 +1026,17 @@ class RfunMainWindow(QtWidgets.QMainWindow):
 
         alpha = self.spinBox_5.value()/100
         hslice = np.where(self.depth_array == self.doubleSpinBox_25.value())[0][0]
-        self.mplwidget_5_ccp_pcolormesh = self.mplwidget_5.figure.axes[0].pcolormesh(self.stack_x, self.stack_y, self.stack[:,:,hslice].T,
-                                                                                     alpha=alpha, transform=ccrs.PlateCarree(), cmap="RdBu")
+        
+        if self.settings['ccp']['appearance']['plotting_method'] == 'colored grid':
+            self.mplwidget_5_ccp_pcolormesh = self.mplwidget_5.figure.axes[0].pcolormesh(self.stack_x, self.stack_y, self.stack[:,:,hslice].T,
+                                                                                         alpha=alpha, transform=ccrs.PlateCarree(), cmap=self.settings['ccp']['appearance']['colormap'])
+        elif self.settings['ccp']['appearance']['plotting_method'] == 'filled contour map':
+            self.mplwidget_5_ccp_pcolormesh = self.mplwidget_5.figure.axes[0].contourf(self.stack_x, self.stack_y, self.stack[:,:,hslice].T,
+                                                                                       alpha=alpha, transform=ccrs.PlateCarree(), cmap=self.settings['ccp']['appearance']['colormap'])
+        elif self.settings['ccp']['appearance']['plotting_method'] == 'contour map':
+            self.mplwidget_5_ccp_pcolormesh = self.mplwidget_5.figure.axes[0].contour(self.stack_x, self.stack_y, self.stack[:,:,hslice].T,
+                                                                                      alpha=alpha, transform=ccrs.PlateCarree(), cmap=self.settings['ccp']['appearance']['colormap'])
+            
         self.first_ccp_stack_plot = False
         self.mplwidget_5.figure.canvas.draw()
     
@@ -821,30 +1069,14 @@ class RfunMainWindow(QtWidgets.QMainWindow):
             self.doubleSpinBox_25.setSingleStep(np.diff(self.depth_array)[0])
             self.plot_ccp_stack()
     
-    def change_ccp_map_extent(self):
-        if not self.first_ccp_stack_plot:
-            miny = min([self.doubleSpinBox_21.value(), self.doubleSpinBox_22.value()])
-            maxy = max([self.doubleSpinBox_21.value(), self.doubleSpinBox_22.value()])
-            minx = min([self.doubleSpinBox_23.value(), self.doubleSpinBox_24.value()])
-            maxx = max([self.doubleSpinBox_23.value(), self.doubleSpinBox_24.value()])
-            self.mplwidget_5.figure.axes[0].set_extent([minx, maxx, miny, maxy], crs=ccrs.PlateCarree())
-            
-            # A secondary axis containing a tile map may exist, if so, we need to adjust its extent
-            # too:
-            if len(self.mplwidget_5.figure.axes) > 1:
-                self.mplwidget_5.figure.axes[1].set_extent([minx, maxx, miny, maxy], crs=ccrs.PlateCarree())
-
-            self.ccp_map_axes_gridlines()
-
-    
     def cross_section_dialog(self):
         
         if self.istack == None:
             self.istack = mwu.interpolate_ccp_stack(self.stack_x, self.stack_y, self.stack)
         
-        start = (self.doubleSpinBox_20.value(), self.doubleSpinBox_17.value())
-        end = (self.doubleSpinBox_18.value(), self.doubleSpinBox_19.value())
-        newlats, newlons, dist_arr = mwu.compute_intermediate_points(start, end, self.spinBox_9.value())
+        start = (self.doubleSpinBox_18.value(), self.doubleSpinBox_17.value())
+        end = (self.doubleSpinBox_20.value(), self.doubleSpinBox_19.value())
+        newlats, newlons, dist_arr = mwu.compute_intermediate_points(start, end, 100)
 
         matrix = []
         for i, stack in enumerate(self.istack):
@@ -864,143 +1096,6 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         """
         dialog = dialogs.CutEarthquakesDialog()
         dialog.exec_()
-
-    def save_figure_dialog(self, figure):
-        """Display the save figure dialog
-        
-        """
-
-        if figure == "stack_figure":
-            fig = self.mplwidget_2.figure
-            preferred_size = (8, 5.5)
-            preferred_margins = (0.10, 0.95, 0.07, 0.92)
-            preferred_xlabel = "Time (s)"
-            if self.comboBox_2.currentText() == "Back az.":
-                preferred_ylabel = "Back azimuth (" + r"$\degree$" + ")"
-            elif self.comboBox_2.currentText() == "Distance":
-                preferred_ylabel = "Distance (" + r"$\degree$" + ")"
-            preferred_title = "RF stack for {} (bin size {}, overlap {})".format(self.comboBox.currentText(),
-                                                                                 self.spinBox.value(),
-                                                                                 self.spinBox_2.value())
-            preferred_fname = "{}_stack".format(self.comboBox.currentText())
-        elif figure == "hk_stack_figure":
-            fig = self.mplwidget_3.figure
-            preferred_size = (4, 5.5)
-            preferred_margins = (0.10, 0.95, 0.10, 0.92)
-            preferred_xlabel = "H (km)"
-            preferred_ylabel = "k"
-            preferred_title = "H-k stack for station {} ({} events)".format(self.comboBox.currentText(),self.hk_result['events'])
-            preferred_fname = "{}_hk".format(self.comboBox.currentText())
-        elif figure == "earthquakes_map_figure":
-            fig = self.mplwidget_4.figure
-            fig.savefig("{}_events.png".format(self.comboBox.currentText()), dpi=600)
-            # Figure must be recreated with the desired size because otherwise the dots and circles are displaced            
-            stnm = self.comboBox.currentText()
-            lat = self.arrivals['stations'][stnm]["lat"]
-            lon = self.arrivals['stations'][stnm]["lon"]
-            proj = ccrs.Stereographic(central_longitude=lon, central_latitude=lat)
-
-            fig = plt.figure(figsize=(4, 5.5))
-            ax = fig.add_subplot(111, projection=proj)
-            r1 = mwu.compute_radius(proj, lat, lon, 30)
-            r2 = mwu.compute_radius(proj, lat, lon, 90)
-            pad_radius = mwu.compute_radius(proj, lat, lon, 90 + 5)
-            ax.set_xlim([-pad_radius, pad_radius])
-            ax.set_ylim([-pad_radius, pad_radius])
-            
-            ax.text(r1, -r1, r"$30\degree$", fontsize=9)
-            ax.text(0.8*r2, -r2*0.8, r"$90\degree$", fontsize=9)
-    
-            ax.add_patch(mpatches.Circle(xy=[lon, lat], radius=r1, fill=False, edgecolor='darkblue', alpha=1, transform=proj, zorder=30))
-            ax.add_patch(mpatches.Circle(xy=[lon, lat], radius=r2, fill=False, edgecolor='darkblue', alpha=1, transform=proj, zorder=30))
-            ax.coastlines()
-        
-            
-            for rf in self.rfs:
-                if rf[5]:
-                    event_id = rf[6]
-                    lat = self.arrivals['events'][event_id]['event_info']['latitude']
-                    lon = self.arrivals['events'][event_id]['event_info']['longitude']
-                    ax.plot(lon, lat, marker='o', color='red',
-                                                         transform=ccrs.Geodetic(), markersize=1.5)
-            
-            fig.savefig("{}_events.png".format(self.comboBox.currentText()), dpi=600)
-            fig.close()
-            
-        elif figure == "ccp_stack_figure":
-            # ccp stack figure must be recreated as the patched pcolormesh
-            # used by cartopy cannot be pickled
-            fig = plt.figure()
-            fig.subplots(1, subplot_kw=dict(projection=ccrs.PlateCarree()))
-            fig.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
-            
-            lats, lons = [], []
-            for stnm in self.rfs_dicts.keys():
-                stla = self.arrivals['stations'][stnm]["lat"]
-                stlo = self.arrivals['stations'][stnm]["lon"]
-                lats.append(stla)
-                lons.append(stlo)
-                fig.axes[0].plot(stlo, stla, marker="^", transform=ccrs.Geodetic(), color="green")
-            
-            if self.stack != None:
-
-                hslice = np.where(self.depth_array == self.doubleSpinBox_25.value())[0][0]
-                fig.axes[0].pcolormesh(self.stack_x, self.stack_y, self.stack[:,:,hslice].T, transform=ccrs.PlateCarree(), cmap="RdBu",
-                                       alpha=self.spinBox_5.value()/100)
-                fig.axes[0].plot([self.ccp_cross_section['x0'], self.ccp_cross_section['x1']],
-                                 [self.ccp_cross_section['y0'], self.ccp_cross_section['y1']], color="red")
-
-            if self.comboBox_6.currentText() == "GEBCO":
-                MAP_SERVICE_URL = 'https://www.gebco.net/data_and_products/gebco_web_services/2019/mapserv?'
-                wms = WebMapService(MAP_SERVICE_URL)
-                layer = 'GEBCO_2019_Grid'
-                fig.axes[0].add_wms(wms, layer)
-            elif self.comboBox_6.currentText() == "Stamen":
-                fig.axes[0].add_image(Stamen('terrain-background'), self.spinBox_6.value())
-
-            spacing = self.doubleSpinBox_26.value()
-            if spacing > 0:
-                extent = self.mplwidget_5.figure.axes[0].get_extent()
-                fig.axes[0].set_extent(extent)
-                fig.axes[0].gridlines(draw_labels=True)
-                xticks = np.arange(extent[0], extent[1] + spacing, spacing)
-                yticks = np.arange(extent[2], extent[3] + spacing, spacing)
-                fig.axes[0].xlocator = mticker.FixedLocator(xticks)
-                fig.axes[0].ylocator = mticker.FixedLocator(yticks)
-
-            # Default figure size, margins, and labels
-            preferred_size = (4, 5.5)
-            preferred_margins = (0.10, 0.95, 0.10, 0.92)
-            preferred_xlabel = "H (km)"
-            preferred_ylabel = "k"
-            preferred_title = "H-k stack for station {} ({} events)".format(self.comboBox.currentText(),self.hk_result['events'])
-            
-            dialog = dialogs.SaveFigureDialog(fig, preferred_size, preferred_margins, preferred_title,
-                                              preferred_xlabel, preferred_ylabel)
-            dialog.exec_()
-            return
-        
-        # We do not want to modify the original figure on the main frame of
-        # the program. But figure objects cannot be copied, not even with
-        # copy.deepcopy(). Therefore we pickle the original figure and load it
-        # again as a new one
-        
-        buffer = io.BytesIO()
-        pickle.dump(fig, buffer)
-        # Point to the first byte of the buffer and read it
-        buffer.seek(0)
-        fig_copy = pickle.load(buffer)
-        
-        #We also need a new canvas manager
-        newfig = plt.figure()
-        newmanager = newfig.canvas.manager
-        newmanager.canvas.figure = fig_copy
-        fig_copy.set_canvas(newmanager.canvas)        
-        
-        dialog = dialogs.SaveFigureDialog(fig_copy, preferred_size, preferred_margins, preferred_title,
-                                          preferred_xlabel, preferred_ylabel, preferred_fname)
-        dialog.exec_()
-        return
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])

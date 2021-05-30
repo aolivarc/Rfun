@@ -14,6 +14,8 @@ import pickle
 from functools import partial
 #import isp.receiverfunctions.rf_dialogs_utils as du
 import rfun_dialogs_utils as du
+import rfun_main_window_utils as mwu
+
 #from isp.Gui.Frames import UiReceiverFunctionsCut, UiReceiverFunctionsSaveFigure, UiReceiverFunctionsCrossSection, BaseFrame
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
@@ -162,7 +164,7 @@ class CrossSectionDialog(QtWidgets.QDialog):
         self.z = z
         
         self.mplwidget.figure.subplots(1)
-        im = self.mplwidget.figure.axes[0].pcolormesh(x, y, z, vmin=np.min(z), vmax=np.max(z), cmap="bwr")
+        im = self.mplwidget.figure.axes[0].pcolormesh(x, y, z, vmin=-1., vmax=1, cmap="RdBu_r")
         
         divider = make_axes_locatable(self.mplwidget.figure.axes[0])
         cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -202,6 +204,124 @@ class CrossSectionDialog(QtWidgets.QDialog):
         dialog = SaveFigureDialog(fig_copy, preferred_size, preferred_margins, preferred_title,
                  preferred_xlabel, preferred_ylabel, preferred_fname)
         dialog.exec_()
+    
+    def close(self):
+        self.done(0)
+
+class PreferencesDialog(QtWidgets.QDialog):
+    def __init__(self):
+        super(PreferencesDialog, self).__init__()
+        uic.loadUi('ui/RfunDialogsPreferences.ui', self)
+        
+        self.pushButton_2.clicked.connect(self.save_settings)
+        self.pushButton_3.clicked.connect(self.close)
+        self.pushButton.clicked.connect(self.reset_to_defaults)
+        
+        self.settings = mwu.read_preferences()
+        self.read_settings()
+    
+    def read_settings(self):
+        
+        # CCP stack settings
+        # Appearance
+        self.checkBox_6.setChecked(self.settings['ccp']['appearance']['include_stations'])
+        self.comboBox_6.setCurrentIndex(self.comboBox_6.findText(self.settings['ccp']['appearance']['plotting_method']))
+        self.comboBox_5.setCurrentIndex(self.comboBox_5.findText(self.settings['ccp']['appearance']['colormap']))
+        self.lineEdit_14.setText(self.settings['ccp']['appearance']['station_marker'])
+        self.lineEdit_13.setText(self.settings['ccp']['appearance']['station_marker_color'])
+        # Shapefiles
+        self.checkBox_5.setChecked(self.settings['ccp']['shapefiles']['include'])
+        self.lineEdit_12.setText(self.settings['ccp']['shapefiles']['path'])
+        # Computation
+        self.comboBox_8.setCurrentIndex(self.comboBox_8.findText(self.settings['ccp']['computation']['stacking_method']))
+        
+        # RFS settings
+        # Appearance
+        self.lineEdit.setText(self.settings['rfs']['appearance']['line_color'])
+        self.doubleSpinBox.setValue(self.settings['rfs']['appearance']['line_width'])
+        self.lineEdit_3.setText(self.settings['rfs']['appearance']['positive_fill_color'])
+        self.lineEdit_2.setText(self.settings['rfs']['appearance']['negative_fill_color'])
+        # Computation
+        self.checkBox.setChecked(self.settings['rfs']['computation']['normalize'])
+        self.doubleSpinBox_2.setValue(self.settings['rfs']['computation']['w0'])
+        self.doubleSpinBox_3.setValue(self.settings['rfs']['computation']['time_shift'])
+        # Stacking
+        self.doubleSpinBox_8.setValue(self.settings['rfs']['stacking']['ref_slowness'])
+        
+        # HK settings
+        # Appearance
+        self.comboBox.setCurrentIndex(self.comboBox.findText(self.settings['hk']['appearance']['plotting_method']))
+        self.comboBox_2.setCurrentIndex(self.comboBox_2.findText(self.settings['hk']['appearance']['colormap']))
+        self.lineEdit_7.setText(self.settings['hk']['appearance']['line_color'])
+        self.lineEdit_8.setText(self.settings['hk']['appearance']['ser_color'])
+        # Computation
+        self.checkBox_2.setChecked(self.settings['hk']['computation']['semblance_weighting'])
+        self.spinBox.setValue(self.settings['hk']['computation']['H_points'])
+        self.spinBox_2.setValue(self.settings['hk']['computation']['k_points'])
+        self.doubleSpinBox_5.setValue(self.settings['hk']['computation']['avg_vp'])
+        # Theoretical arrival times
+        self.doubleSpinBox_6.setValue(self.settings['hk']['theoretical_atimes']['ref_slowness'])
+        self.doubleSpinBox_7.setValue(self.settings['hk']['theoretical_atimes']['avg_vp'])
+
+        # Crustal thickness map
+        # Appearance
+        self.checkBox_3.setChecked(self.settings['map']['appearance']['include_stations'])
+        self.comboBox_3.setCurrentIndex(self.comboBox_3.findText(self.settings['map']['appearance']['plotting_method']))
+        self.comboBox_4.setCurrentIndex(self.comboBox_4.findText(self.settings['map']['appearance']['colormap']))
+        self.lineEdit_10.setText(self.settings['map']['appearance']['station_marker'])
+        self.lineEdit_9.setText(self.settings['map']['appearance']['station_marker_color'])
+        # Shapefiles
+        self.checkBox_4.setChecked(self.settings['map']['shapefiles']['include'])
+        self.lineEdit_11.setText(self.settings['map']['shapefiles']['path'])
+
+    def close(self):
+        self.done(0)
+        
+    def save_settings(self):
+
+        settings = {'ccp':{'appearance':{'include_stations':self.checkBox_6.isChecked(),
+                                         'plotting_method':self.comboBox_6.currentText(),
+                                         'colormap':self.comboBox_5.currentText(),
+                                         'station_marker':self.lineEdit_14.text(),
+                                         'station_marker_color':self.lineEdit_13.text()},
+                           'shapefiles':{'include':self.checkBox_5.isChecked(),
+                                         'path':self.lineEdit_12.text()},
+                           'computation':{'earth_model':self.comboBox_7.currentText(),
+                                          'stacking_method':self.comboBox_8.currentText()}},
+                    'rfs':{'appearance':{'line_color':self.lineEdit.text(),
+                                         'line_width':self.doubleSpinBox.value(),
+                                         'positive_fill_color':self.lineEdit_3.text(),
+                                         'negative_fill_color':self.lineEdit_2.text()},
+                           'computation':{'normalize':self.checkBox.isChecked(),
+                                          'w0':self.doubleSpinBox_2.value(),
+                                          'time_shift':self.doubleSpinBox_3.value()},
+                           'stacking':{'ref_slowness':self.doubleSpinBox_8.value()}},
+                    'hk':{'appearance':{'plotting_method':self.comboBox.currentText(),
+                                        'colormap':self.comboBox_2.currentText(),
+                                        'line_color':self.lineEdit_7.text(),
+                                        'ser_color':self.lineEdit_8.text()},
+                          'computation':{'semblance_weighting':self.checkBox_2.isChecked(),
+                                         'H_points':self.spinBox.value(),
+                                         'k_points':self.spinBox_2.value(),
+                                         'avg_vp':self.doubleSpinBox_5.value()},
+                          'theoretical_atimes':{'ref_slowness':self.doubleSpinBox_6.value(),
+                                                'avg_vp':self.doubleSpinBox_7.value()}},
+                    'map':{'appearance':{'include_stations':self.checkBox_3.isChecked(),
+                                         'plotting_method':self.comboBox_3.currentText(),
+                                         'colormap':self.comboBox_4.currentText(),
+                                         'station_marker':self.lineEdit_10.text(),
+                                         'station_marker_color':self.lineEdit_9.text()},
+                           'shapefiles':{'include':self.checkBox_4.isChecked(),
+                                         'path':self.lineEdit_11.text()}}}
+        
+        pickle.dump(settings, open('rfun.conf', 'wb'))
+    
+    def reset_to_defaults(self):
+        qm = QtWidgets.QMessageBox
+        ret = qm.question(self,'', "Are you sure to reset all the values?", qm.Yes | qm.No)
+        if ret == qm.Yes:
+            self.settings = mwu.read_preferences(return_defaults=True)
+            self.read_settings()
     
     def close(self):
         self.done(0)
