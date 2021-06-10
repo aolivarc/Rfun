@@ -20,7 +20,7 @@ Then, install Rfun's dependencies:
 ```
 (rfun) $ conda install -c conda-forge numpy scipy matplotlib pyqt obspy shapefile cartopy
 ```
-Once the dependencies are installed, navigate to Rfun's root directory and run the setup.py file
+Once the dependencies are installed, navigate to Rfun's root directory and run the setup.py file:
 ```
 (rfun) $ python setup.py install
 ```
