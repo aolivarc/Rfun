@@ -6,21 +6,21 @@ the crustal thickness below the receiver (via a semblance-weighted H-k stacking 
 (CCP) stacks. A tutorial is coming soon™.
 
 # Installation (Linux/Windows)
-Rfun requires several packages, which are listed in the requeriments.txt file. I recommend using [Anaconda](https://www.anaconda.com/products/individual#Downloads)
-or [Miniconda](https://docs.conda.io/en/latest/miniconda.html/) for installation as using other tools like pip can be problematic. I have not performed any tests
+Rfun requires several packages, which are listed in the requeriments.txt file. I recommend using [Anaconda]{https://www.anaconda.com/products/individual#Downloads}
+or [Miniconda]{https://docs.conda.io/en/latest/miniconda.html/} for installation as using other tools like pip can be problematic. I have not performed any tests
 in macOS, but the following should work for that platform as well.
 
 Once you have installed Anaconda/Miniconda, open up a command prompt (if working in Windows, make sure to open an Anaconda Prompt), create and activate a new Python3
 environment:
 ```
-$ conda create -n rfun python=3
+$ conda create -n rfun python=3.9.5
 $ conda activate rfun
 ```
 Then, install Rfun's dependencies:
 ```
 (rfun) $ conda install -c conda-forge numpy scipy matplotlib pyqt obspy shapefile cartopy
 ```
-Once the dependencies are installed, navigate to Rfun's root directory and run the setup.py file:
+Once the dependencies are installed, navigate to Rfun's root directory and run the setup.py file
 ```
 (rfun) $ python setup.py install
 ```

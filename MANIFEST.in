@@ -1,0 +1,2 @@
+include rfun/ui/*.ui
+include rfun/earth_models/*.csv
