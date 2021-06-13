@@ -6,8 +6,8 @@ the crustal thickness below the receiver (via a semblance-weighted H-k stacking 
 (CCP) stacks. A tutorial is coming soon™.
 
 # Installation (Linux/Windows)
-Rfun requires several packages, which are listed in the requeriments.txt file. I recommend using [Anaconda]{https://www.anaconda.com/products/individual#Downloads}
-or [Miniconda]{https://docs.conda.io/en/latest/miniconda.html/} for installation as using other tools like pip can be problematic. I have not performed any tests
+Rfun requires several packages, which are listed in the requeriments.txt file. I recommend using [Anaconda](https://www.anaconda.com/products/individual#Downloads)
+or [Miniconda](https://docs.conda.io/en/latest/miniconda.html/) for installation as using other tools like pip can be problematic. I have not performed any tests
 in macOS, but the following should work for that platform as well.
 
 Once you have installed Anaconda/Miniconda, open up a command prompt (if working in Windows, make sure to open an Anaconda Prompt), create and activate a new Python3
