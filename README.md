@@ -16,9 +16,9 @@ environment:
 $ conda create -n rfun python=3.9.5
 $ conda activate rfun
 ```
-Then, install Rfun's dependencies:
+Then, install Rfun's dependencies, which are listed in the requeriments.txt file:
 ```
-(rfun) $ conda install -c conda-forge numpy scipy matplotlib pyqt obspy shapefile cartopy
+(rfun) $ conda install -c conda-forge <package1>=<version> <package2>=<version> ...
 ```
 Once the dependencies are installed, navigate to Rfun's root directory and run the setup.py file
 ```
