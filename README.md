@@ -5,6 +5,9 @@ windows for selected events. These windows are then used to compute the receiver
 the crustal thickness below the receiver (via a semblance-weighted H-k stacking algorithm) or to generate Common Conversion Point
 (CCP) stacks. A tutorial is coming soon™.
 
+Rfun is also distributed as part of [ISP/Integrated Seismic Program](https://github.com/ProjectISP/ISP)! ISP aims to provide a comfortable GUI for performing diverse 
+tasks in earthquake seismology, from array analysis to seismic moment tensor inversion. Be sure to check it out as well!
+
 # Installation (Linux/Windows)
 Rfun requires several packages, which are listed in the requeriments.txt file. I recommend using [Anaconda](https://www.anaconda.com/products/individual#Downloads)
 or [Miniconda](https://docs.conda.io/en/latest/miniconda.html/) for installation as using other tools like pip can be problematic. I have not performed any tests
