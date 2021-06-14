@@ -192,12 +192,19 @@ class RfunMainWindow(QtWidgets.QMainWindow):
         dir_ = QtWidgets.QFileDialog.getOpenFileName()[0]
         
         if dir_:
-            self.arrivals = pickle.load(open(dir_, 'rb'))
-            
-            # Enable the other menu actions
-            self.actionRead_waveforms.setEnabled(True)
-            self.actionRead_RFs.setEnabled(True)
-            self.actionRead_CCP_Stack.setEnabled(True)
+            try:
+                self.arrivals = pickle.load(open(dir_, 'rb'))
+                # Enable the other menu actions
+                self.actionRead_waveforms.setEnabled(True)
+                self.actionRead_RFs.setEnabled(True)
+                self.actionRead_CCP_Stack.setEnabled(True)
+            except:
+                qm = QtWidgets.QMessageBox
+                qm.warning(self,'', "Invalid event data file.")
+                self.actionRead_waveforms.setEnabled(False)
+                self.actionRead_RFs.setEnabled(False)
+                self.actionRead_CCP_Stack.setEnabled(False)
+
     
     def compute_srcfs(self):
         """Compute source functions by averaging the L (or Z) component of all
