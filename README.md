@@ -3,7 +3,8 @@ Rfun is a graphical user interface (GUI) equipped program aimed at providing an 
 which to perform the computation and analysis of receiver functions. The software provides a tool that automatically cuts P-wave
 windows for selected events. These windows are then used to compute the receiver functions, which in turn can be used to study
 the crustal thickness below the receiver (via a semblance-weighted H-k stacking algorithm) or to generate Common Conversion Point
-(CCP) stacks. A tutorial is coming soon™.
+(CCP) stacks. A tutorial is coming soon™. In the meantime, please feel free to contact me for information on how to use the program
+(olivar.ac@gmail.com).
 
 Rfun is also distributed as part of [ISP/Integrated Seismic Program](https://github.com/ProjectISP/ISP)! ISP aims to provide a comfortable GUI for performing diverse 
 tasks in earthquake seismology, from array analysis to seismic moment tensor inversion. Be sure to check it out as well!
