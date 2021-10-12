@@ -155,7 +155,7 @@ def waterlevel_deconvolution(dcmp, scmp, delta, a, c, tshift, w0=0,
     # Langston, 1979
     num = dfft * np.conj(sfft)
     deno = np.maximum(sfft*np.conj(sfft), c*np.max(sfft*np.conj(sfft)))
-    rf = np.fft.irfft((num/deno)* np.exp(-0.5*(2*np.pi*freq-w0)**2/(a**2)) * np.exp(-1j * tshift * 2 * np.pi * freq))
+    rf = np.fft.irfft((num/deno)* np.exp(-0.25*(2*np.pi*freq-w0)**2/(a**2))/delta * np.exp(-1j * tshift * 2 * np.pi * freq))
 
     if normalize:
         rf = rf / np.max(np.abs(rf))
@@ -232,10 +232,8 @@ def compute_rfs(stnm, data_map, arrivals, srfs={}, dcmpn="Q", scmpn="L",
         
         # Pad data and perform deconvolution
         rf = waterlevel_deconvolution(dcmp, -scmp, st[0].stats.delta, a, c, time_shift, w0=w0,
-                                      normalize=True)
+                                      normalize=normalize)
 
-
-        
         t = np.arange(-time_shift, -time_shift+delta*len(dcmp), delta)
         
         # It can happen that t and rf differ in length by 1 sample due to rounding
