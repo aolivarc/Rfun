@@ -1,3 +1,5 @@
+-- The code here is a bit outdated and over time I have found out several bugs/problems. I have been slowly working in a new, updated version which will be ready "soon". In the meantime, please use with caution --
+
 # Rfun, a GUI-equipped toolbox for the computation and analysis of receiver functions
 Rfun is a graphical user interface (GUI) equipped program aimed at providing an interactive and easy to use environment in
 which to perform the computation and analysis of receiver functions. The software provides a tool that automatically cuts P-wave
